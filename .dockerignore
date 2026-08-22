@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+data/
+notebooks/
+experiments/mlflow.db
+tests/
+*.ipynb_checkpoints

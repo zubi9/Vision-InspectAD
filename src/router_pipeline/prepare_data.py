@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from src.router_pipeline import config
+from src.common import paths
 
 
 
@@ -49,29 +49,8 @@ MASK_SUFFIXES = (
     "-labels",
 )
 
-MVTec_CATEGORIES = [
-    "bottle",
-    "cable",
-    "capsule",
-    "carpet",
-    "grid",
-    "hazelnut",
-    "leather",
-    "metal_nut",
-    "pill",
-    "screw",
-    "tile",
-    "toothbrush",
-    "transistor",
-    "wood",
-    "zipper",
-]
-
-ROUTER_CLASSES = [
-    "DAGM",
-    "KolektorSDD2",
-    "Magnetic_Tile",
-] + [f"MVTec_{x}" for x in MVTec_CATEGORIES]
+MVTec_CATEGORIES = paths.MVTEC_CATEGORIES
+ROUTER_CLASSES = paths.ROUTER_CLASSES
 
 
 
@@ -83,14 +62,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-root",
         type=Path,
-        default=Path(config.RAW_DATA_ROOT),
-        help="Root containing the original datasets. Default: datasets",
+        default=paths.ROUTER_SOURCE_ROOT,
+        help="Unified dataset root built by link_datasets.py (contains MVTec_AD/, "
+             "DAGM/, KolektorSDD2/, Magnetic_Tile/ as immediate children).",
     )
 
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path(config.CLS_ROUTER_DATA_ROOT),
+        default=paths.DOMAIN_ROUTER_DATASET_ROOT,
         help="Router dataset output directory.",
     )
 

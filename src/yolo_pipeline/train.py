@@ -1,28 +1,26 @@
 """
-Train YOLO26-seg on the combined supervised defect dataset (DAGM + Magnetic Tiles +
-Kolektor SDD2, merged into one Ultralytics-format dataset).
+Train a YOLO26-seg specialist on one supervised defect dataset (DAGM, Magnetic
+Tiles, or Kolektor SDD2 -- each trained separately, not combined).
 
-This assumes the three datasets have already been merged into a single YOLO
-segmentation dataset with one data.yaml (standard Ultralytics multi-class format):
+Expects a per-dataset Ultralytics-format dataset with one data.yaml:
 
-    data/supervised_combined/
+    data/yolo-seg-ds/<dagm|kolektor|magnetic_tile>/
         images/train/*.jpg
         images/val/*.jpg
         labels/train/*.txt      # YOLO-seg polygon format
         labels/val/*.txt
-        data.yaml                # names: [dagm classes..., magnetic tile classes..., kolektor classes...]
+        data.yaml
 
-Merging DAGM (weak texture-defect labels), Magnetic Tiles (per-defect-type folders),
-and Kolektor SDD2 (pixel masks) into one consistent YOLO-seg label format is its own
-data-engineering task -- this script trains against the merged result, it doesn't do
-the merging itself.
+Converting each dataset's native label format into YOLO-seg polygons is its own
+data-engineering task -- this script trains against the converted result.
 
-One combined model (not three separate ones) was chosen deliberately: it lets the
-router treat "supervised defect" as a single class (see src/router_pipeline/), and
-YOLO natively supports multi-class detection in one model, unlike Anomalib's
-one-class-per-category constraint.
+Called 3x, once per specialist -- see train_all_specialists.py for a wrapper that
+runs all three with the right default paths per specialist, rather than three
+manual invocations each needing the correct --data/--output-dir typed by hand.
 
 Usage:
+    python train.py --data ./data/yolo-seg-ds/dagm/data.yaml --output-dir ./models/dagm --epochs 100
+
     python train.py --data ./data/supervised_combined/data.yaml --epochs 100
 """
 
@@ -32,15 +30,18 @@ from pathlib import Path
 import mlflow
 from ultralytics import YOLO
 
+from src.common import paths
+
 
 def train(
     data_yaml: Path,
     epochs: int = 100,
     image_size: int = 640,
     base_weights: str = "yolo26s-seg.pt",
-    output_dir: Path = Path("./models/yolo26seg"),
+    output_dir: Path = Path("./models/specialist"),
+    run_name: str = "yolo26seg-specialist",
     mlflow_experiment: str = "visioninspect-yolo26seg",
-    mlflow_tracking_uri: str = "sqlite:///./experiments/mlflow.db",
+    mlflow_tracking_uri: str = paths.MLFLOW_TRACKING_URI,
 ) -> dict:
     if mlflow_tracking_uri.startswith("sqlite:///"):
         db_path = Path(mlflow_tracking_uri.replace("sqlite:///", "", 1))
@@ -51,12 +52,13 @@ def train(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with mlflow.start_run(run_name="yolo26seg-combined") as run:
+    with mlflow.start_run(run_name=run_name) as run:
         mlflow.log_params({
             "base_weights": base_weights,
             "epochs": epochs,
             "image_size": image_size,
             "data_yaml": str(data_yaml),
+            "output_dir": str(output_dir),
         })
 
         model = YOLO(base_weights)
@@ -82,20 +84,19 @@ def train(
         print(f"\n[done] run_id={run_id}")
         print(f"[done] best weights: {best_weights}")
         print(f"[done] class names: {model.names}")
-        print(f"[done] IMPORTANT: copy or symlink {best_weights} to "
-              f"src/yolo_pipeline/weights/best.pt for the API/registry to find it, "
-              f"and fill in PROVENANCE.md with this run_id.")
 
     return {"run_id": run_id, "checkpoint": str(best_weights), "class_names": model.names, "metrics": metrics}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data", type=Path, required=True, help="Path to the merged dataset's data.yaml")
+    parser.add_argument("--data", type=Path, required=True, help="Path to this specialist's data.yaml")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--image-size", type=int, default=640)
     parser.add_argument("--base-weights", type=str, default="yolo26s-seg.pt")
-    parser.add_argument("--output-dir", type=Path, default=Path("./models/yolo26seg"))
+    parser.add_argument("--output-dir", type=Path, required=True,
+                         help="e.g. ./models/dagm, ./models/kolektor, ./models/magnetic_tile")
+    parser.add_argument("--run-name", type=str, default="yolo26seg-specialist")
     args = parser.parse_args()
 
     train(
@@ -104,6 +105,7 @@ def main():
         image_size=args.image_size,
         base_weights=args.base_weights,
         output_dir=args.output_dir,
+        run_name=args.run_name,
     )
 
 

@@ -13,12 +13,12 @@ are replaced, not duplicated.
 
 Usage:
     python link_datasets.py
-    python link_datasets.py --data-root ./data --output-root ./data/router_source
+    python link_datasets.py --mvtec-root ./data/raw --output-root ./data/router_source
 """
 
 import argparse
 from pathlib import Path
-from src.router_pipeline import config
+from src.common import paths
 
 
 def link_dataset(source: Path, dest: Path) -> bool:
@@ -35,18 +35,21 @@ def link_dataset(source: Path, dest: Path) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    # use data-root defined in config.py as default, but allow override via CLI for testing
-    parser.add_argument("--data-root", type=Path, default=Path(config.RAW_DATA_ROOT), help="Root of the existing data layout")
-    parser.add_argument("--output-root", type=Path, default=Path(config.CLS_ROUTER_DATA_ROOT), help="Root of the router_source layout to create")
+    parser.add_argument("--mvtec-root", type=Path, default=paths.MVTEC_RAW_ROOT)
+    parser.add_argument("--dagm-root", type=Path, default=paths.DAGM_RAW_ROOT)
+    parser.add_argument("--magnetic-tiles-root", type=Path, default=paths.MAGNETIC_TILES_RAW_ROOT)
+    parser.add_argument("--kolektor-root", type=Path, default=paths.KOLEKTOR_SDD2_RAW_ROOT)
+    parser.add_argument("--output-root", type=Path, default=paths.ROUTER_SOURCE_ROOT,
+                         help="Root of the router_source layout to create")
     args = parser.parse_args()
 
     args.output_root.mkdir(parents=True, exist_ok=True)
 
     mapping = {
-        args.data_root / "raw": args.output_root / "MVTec_AD",
-        args.data_root / "raw_supervised" / "dagm": args.output_root / "DAGM",
-        args.data_root / "raw_supervised" / "magnetic_tiles": args.output_root / "Magnetic_Tile",
-        args.data_root / "raw_supervised" / "kolektor_sdd2": args.output_root / "KolektorSDD2",
+        args.mvtec_root: args.output_root / "MVTec_AD",
+        args.dagm_root: args.output_root / "DAGM",
+        args.magnetic_tiles_root: args.output_root / "Magnetic_Tile",
+        args.kolektor_root: args.output_root / "KolektorSDD2",
     }
 
     n_linked = sum(link_dataset(src, dst) for src, dst in mapping.items())

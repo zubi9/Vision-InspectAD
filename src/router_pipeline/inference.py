@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 import argparse
 import json
-from logging import config
 from pathlib import Path
 
 from ultralytics import YOLO
+
+from src.common import paths
 
 EXT = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
 def args():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", type=Path(config.PROJECT_ROOT) / "models" / "runs" / "classify" / "weights" / "best.onnx", required=True)
+    p.add_argument("--model", type=Path, default=paths.ROUTER_ONNX_PATH)
     p.add_argument("--source", type=Path, required=True)
     p.add_argument("--imgsz", type=int, default=224)
-    p.add_argument("--threshold", type=float, default=25.0)
+    p.add_argument("--threshold", type=float, default=0.0)
     p.add_argument("--device", default=None)
-    p.add_argument("--output", type=Path(config.PROJECT_ROOT) / "results" / "classify" / "specialist_router_predictions.json")
+    p.add_argument("--output", type=Path, default=paths.PROJECT_ROOT / "results" / "classify" / "specialist_router_predictions.json")
     p.add_argument("--recursive", action="store_true")
     return p.parse_args()
 

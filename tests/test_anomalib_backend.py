@@ -75,13 +75,27 @@ def test_heatmap_to_regions():
     assert regions[0].label is None
 
 
+class FakeDim:
+    def __init__(self, length: int):
+        self._length = length
+        self.is_static = True
+
+    def get_length(self) -> int:
+        return self._length
+
+
+class FakeInputBlob:
+    def __init__(self, height: int, width: int, channels: int = 3):
+        self.partial_shape = [FakeDim(1), FakeDim(channels), FakeDim(height), FakeDim(width)]
+
+
 def test_predict_returns_expected_schema(tmp_path, monkeypatch):
     model_path = tmp_path / "model.onnx"
     model_path.touch()
 
     class FakeInferencer:
         def __init__(self, **kwargs):
-            pass
+            self.input_blob = FakeInputBlob(height=4, width=4)
 
         def predict(self, image):
             return SimpleNamespace(
@@ -89,9 +103,10 @@ def test_predict_returns_expected_schema(tmp_path, monkeypatch):
                 pred_label=True,
                 anomaly_map=np.array(
                     [
-                        [0.0, 0.0, 0.0],
-                        [0.0, 0.9, 0.9],
-                        [0.0, 0.9, 0.9],
+                        [0.0, 0.0, 0.0, 0.0],
+                        [0.0, 0.9, 0.9, 0.0],
+                        [0.0, 0.9, 0.9, 0.0],
+                        [0.0, 0.0, 0.0, 0.0],
                     ],
                     dtype=np.float32,
                 ),
@@ -99,7 +114,7 @@ def test_predict_returns_expected_schema(tmp_path, monkeypatch):
 
     monkeypatch.setattr(backend, "OpenVINOInferencer", FakeInferencer)
 
-    image = Image.new("RGB", (3, 3))
+    image = Image.new("RGB", (4, 4))
     result = backend.AnomalibBackend().predict(image, model_path)
 
     assert result["defect_detected"] is True
@@ -113,7 +128,7 @@ def test_predict_falls_back_to_score_threshold(tmp_path, monkeypatch):
 
     class FakeInferencer:
         def __init__(self, **kwargs):
-            pass
+            self.input_blob = FakeInputBlob(height=4, width=4)
 
         def predict(self, image):
             return SimpleNamespace(

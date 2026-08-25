@@ -6,13 +6,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ROUTER_ONNX_PATH=${ROUTER_ONNX_PATH:-./runs/classify/specialist_router/weights/best.onnx}
-      - ROUTER_CONFIDENCE_THRESHOLD=${ROUTER_CONFIDENCE_THRESHOLD:-0.6}
-      - ANOMALIB_MODELS_DIR=${ANOMALIB_MODELS_DIR:-./models/onnx/weights}
-      - COMBINED_YOLO_ONNX_PATH=${COMBINED_YOLO_ONNX_PATH:-./models/yolo26seg/weights/best.onnx}
+      - VI_ROUTER_ONNX_PATH=${VI_ROUTER_ONNX_PATH:-/app/models/runs/classify/specialist_router/weights/best.onnx}
+      - VI_ROUTER_CONFIDENCE_THRESHOLD=${VI_ROUTER_CONFIDENCE_THRESHOLD:-0.6}
+      - VI_ANOMALIB_MODELS_DIR=${VI_ANOMALIB_MODELS_DIR:-/app/models}
+      - VI_ANOMALIB_ONNX_DIR=${VI_ANOMALIB_ONNX_DIR:-/app/models/onnx}
+      - VI_DAGM_ONNX_PATH=${VI_DAGM_ONNX_PATH:-/app/models/dagm/weights/best.onnx}
+      - VI_KOLEKTOR_ONNX_PATH=${VI_KOLEKTOR_ONNX_PATH:-/app/models/kolektor/weights/best.onnx}
+      - VI_MAGNETIC_TILE_ONNX_PATH=${VI_MAGNETIC_TILE_ONNX_PATH:-/app/models/magnetic_tile/weights/best.onnx}
     volumes:
       - ./models:/app/models
-      - ./runs:/app/runs
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s

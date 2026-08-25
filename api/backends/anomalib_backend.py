@@ -121,9 +121,11 @@ class AnomalibBackend:
 
     def _heatmap_to_regions(self, anomaly_map: np.ndarray) -> list[Region]:
         """Threshold the anomaly heatmap and extract bounding boxes via connected
-        components -- same underlying technique as converting MVTec's ground-truth
-        masks into bounding boxes earlier in this project, applied here to a
-        predicted heatmap instead of a label."""
+        components. Uses cv2.connectedComponentsWithStats rather than
+        findContours+contourArea: contourArea measures the polygon's geometric area
+        through pixel centers, which undercounts small blocky regions (a solid 2x2
+        block has contourArea == 1.0, not 4) and would silently drop small real
+        defects under a pixel-count-based noise threshold."""
         if anomaly_map.ndim > 2:
             anomaly_map = anomaly_map.squeeze()
 
@@ -133,13 +135,13 @@ class AnomalibBackend:
             normalized = (normalized - normalized.min()) / span if span > 0 else normalized
 
         mask = (normalized >= self.region_threshold).astype(np.uint8)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
         regions = []
-        for contour in contours:
-            if cv2.contourArea(contour) < 4:  # drop noise-sized specks
+        for label_id in range(1, num_labels):  # 0 is background
+            x, y, w, h, area = stats[label_id]
+            if area < 4:  # true pixel count, not polygon area -- drop noise-sized specks
                 continue
-            x, y, w, h = cv2.boundingRect(contour)
             region_score = float(normalized[y:y + h, x:x + w].max())
             regions.append(Region(
                 bbox=(float(x), float(y), float(x + w), float(y + h)),

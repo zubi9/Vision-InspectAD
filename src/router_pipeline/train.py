@@ -3,7 +3,7 @@ import argparse
 import json
 import time
 from pathlib import Path
-form visioninspect_v112.api import config
+from src.common import paths
 
 import mlflow
 from ultralytics import YOLO
@@ -22,9 +22,9 @@ def args():
     p.add_argument("--patience", type=int, default=10)
     p.add_argument("--experiment", default="VisionInspect-Router")
     p.add_argument("--run-name", default=None)
-    p.add_argument("--tracking-uri", default="sqlite:///./experiments/mlflow.db")
-    p.add_argument("--project", type=Path, default=Path(config.PROJECT_ROOT) / "models" / "runs" / "classify")
-    p.add_argument("--name", default="specialist_router")
+    p.add_argument("--tracking-uri", default=paths.MLFLOW_TRACKING_URI)
+    p.add_argument("--project", type=Path, default=paths.ROUTER_RUN_DIR)
+    p.add_argument("--name", default=paths.ROUTER_RUN_NAME)
     p.add_argument("--export-onnx", action="store_true")
     return p.parse_args()
 

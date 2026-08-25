@@ -161,7 +161,7 @@ uvicorn api.main:app --reload
 Then:
 
 ```bash
-curl -X POST -F "file=@some_image.png" http://localhost:8000/predict
+curl -X POST -F "file=@some_image.png" http://localhost:8002/predict
 ```
 
 **Expects ONNX exports already in place** at the paths `api/config.py` defaults to (matching each

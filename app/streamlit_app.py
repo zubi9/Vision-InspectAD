@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import requests
+from pathlib import Path
 import streamlit as st
 from PIL import Image, ImageDraw
 
@@ -85,23 +86,28 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Helper function to convert local image to base64
-def get_image_as_base64(path):
-    with open(path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode()
+script_dir = Path(__file__).parent
+icon_path = script_dir / "assets" / "icon.png"
 
-# Read your local PNG icon
-icon_base64 = get_image_as_base64("./assets/icon.png")
+if icon_path.exists() and icon_path.is_file():
+    with open(icon_path, "rb") as image_file:
+        icon_base64 = base64.b64encode(image_file.read()).decode()
+    icon_html = f'<img src="data:image/png;base64,{icon_base64}" style="width: 38px; height: 38px; object-fit: contain;">'
+else:
+    icon_html = '<span style="font-size: 32px;">🔍</span>'
 
-st.markdown(f"""
+st.markdown(
+    f"""
     <div class="main-header">
-        <h1 style="display: flex; align-items: center; gap: 18px;">
-            <img src="data:image/png;base64,{icon_base64}" style="width: 38px; height: 38px; object-fit: contain;">
+        <h1 style="display: flex; align-items: center; gap: 12px;">
+            {icon_html}
             VisionInspect AD
         </h1>
         <p>A unified industrial defect inspection solution — Anomalib and YOLO26</p>
     </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 uploaded = st.file_uploader("Upload an image for analysis", type=["png", "jpg", "jpeg", "bmp"])
 

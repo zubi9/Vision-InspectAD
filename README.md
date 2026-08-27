@@ -246,3 +246,4 @@ Phase 2 (Anomalib model/backbone comparison) picks up once Phase 1 baseline chec
 With the router and YOLO26-seg training now in place too, Phase 3 (the inference API) is the next
 big piece: wiring `model_registry.py` + the router into an actual `/predict` endpoint. See the
 project plan doc for the full Phase 2–6 roadmap.
+# echo test CI

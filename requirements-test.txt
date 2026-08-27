@@ -4,11 +4,16 @@
 # anyway. The full dependency graph is still exercised by the Docker build job,
 # which uses the real requirements.txt.
 
+# --- Test / CI dependencies ---
+
+# API
 fastapi>=0.110
-httpx>=0.27
 pydantic>=2.0
+python-multipart>=0.0.9
+
+# Testing
 pytest>=8.0
-numpy>=1.24
-opencv-python-headless>=4.9
-pillow>=10.0
+httpx>=0.27
+
+# Linting
 ruff>=0.6

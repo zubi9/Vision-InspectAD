@@ -9,7 +9,6 @@ Usage:
 """
 
 import argparse
-from pathlib import Path
 
 from src.common import paths
 from train import train

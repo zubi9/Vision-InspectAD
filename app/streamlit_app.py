@@ -1,8 +1,8 @@
 import base64
 import io
 import os
-import requests
 from pathlib import Path
+import requests
 import streamlit as st
 from PIL import Image, ImageDraw
 
@@ -86,9 +86,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
 script_dir = Path(__file__).parent
 icon_path = script_dir / "assets" / "icon.png"
 
+# Safe loader prevents Docker containers from breaking on missing files
 if icon_path.exists() and icon_path.is_file():
     with open(icon_path, "rb") as image_file:
         icon_base64 = base64.b64encode(image_file.read()).decode()
@@ -181,11 +183,15 @@ if uploaded:
     input_col, output_col = st.columns(2)
 
     with input_col:
-        st.image(image, caption="Original Input", width="stretch")
+        st.image(
+            image,
+            caption="Original industrial image submitted for defect inspection",
+            width="stretch",
+        )
 
     with output_col:
         st.image(
-            predicted_output, 
+            predicted_output,
             caption=f"Heatmap / Bounding Prediction ({result['source_model']})", 
             width="stretch"
         )

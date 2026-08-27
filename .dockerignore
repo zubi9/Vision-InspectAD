@@ -7,3 +7,5 @@ notebooks/
 experiments/mlflow.db
 tests/
 *.ipynb_checkpoints
+.ckpt
+.pt

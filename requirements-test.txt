@@ -1,0 +1,14 @@
+# Lightweight subset for running the unit test suite in CI. Heavy ML frameworks
+# (torch, anomalib, ultralytics, mlflow) are intentionally NOT here -- tests/conftest.py
+# stubs them out when absent, since the test suite mocks their public interfaces
+# anyway. The full dependency graph is still exercised by the Docker build job,
+# which uses the real requirements.txt.
+
+fastapi>=0.110
+httpx>=0.27
+pydantic>=2.0
+pytest>=8.0
+numpy>=1.24
+opencv-python-headless>=4.9
+pillow>=10.0
+ruff>=0.6

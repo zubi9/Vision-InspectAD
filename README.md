@@ -161,7 +161,7 @@ uvicorn api.main:app --reload
 Then:
 
 ```bash
-curl -X POST -F "file=@some_image.png" http://localhost:8002/predict
+curl -X POST -F "file=@some_image.png" http://localhost:8000/predict
 ```
 
 **Expects ONNX exports already in place** at the paths `api/config.py` defaults to (matching each
@@ -211,6 +211,34 @@ streamlit run app/streamlit_app.py
 
 `PredictionResult` now carries `heatmap_overlay_base64` (Anomalib only) alongside `regions`, so
 Streamlit shows a heatmap overlay for anomaly results and drawn boxes/masks for YOLO results.
+
+## Testing & CI (Phase 5)
+
+```bash
+pip install -r requirements-test.txt   # lightweight -- no torch/anomalib/ultralytics needed
+pytest -v
+or Try.
+PYENV_VERSION=<your-testing-env> python -m pytest -v
+```
+
+`tests/conftest.py` stubs `anomalib`, `ultralytics`, and `mlflow` when they're not installed, since
+every test mocks their public interfaces (`OpenVINOInferencer`, `YOLO`) directly rather than
+needing the real heavy frameworks. This keeps the test job fast; the full dependency graph is
+still exercised for real by the Docker build job.
+
+Coverage: dataset structure verification (`test_prepare_data.py`), both inference backends
+(`test_anomalib_backend.py`, `test_yolo_backend.py`), the router's confidence gating
+(`test_router_backend.py`), the dispatch registry (`test_model_registry.py`), shared schema
+normalization (`test_schemas.py`), and API endpoints end-to-end (`test_api.py`, via
+`TestClient` — deliberately *not* using the `with` context manager, so the real model-loading
+lifespan never runs; `app_state` is populated with fakes per test instead).
+
+**`.github/workflows/ci.yml`** runs on every push/PR: unit tests, `ruff check` + `ruff format
+--check`, and a Docker build of both images (API + Streamlit) to catch Dockerfile breakage early.
+Note the API image no longer bakes in model weights (`models/` is gitignored and empty on a fresh
+checkout) — it creates an empty `models/` dir at build time and relies on `docker-compose.yml`'s
+volume mount for real weights at runtime, which also means CI's Docker build doesn't need any
+trained checkpoints to succeed.
 
 ## What's next
 

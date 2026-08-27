@@ -11,7 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 COPY api/ ./api/
-COPY models/ ./models/
+
+# Model weights are NOT baked into the image -- they're large, change independently
+# of code, and mounting them (see docker-compose.yml's ./models:/app/models volume)
+# means a fresh clone with no trained weights yet still builds successfully, which
+# also matters for CI (models/ is gitignored and won't exist on a checkout).
+RUN mkdir -p models
 
 EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

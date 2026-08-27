@@ -1,3 +1,17 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = ["notebooks", "data", "models", "experiments", "runs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = [
+    "E501",  # line length -- formatter/CI don't need to agree pixel-for-pixel with hand-wrapped docstrings
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401"]  # test files intentionally import fixtures/monkeypatch targets not directly referenced

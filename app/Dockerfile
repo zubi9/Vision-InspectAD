@@ -5,6 +5,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir streamlit requests pillow
 
 COPY app/ ./app/
+COPY assets/ ./assets/
 
 EXPOSE 8501
 CMD ["streamlit", "run", "app/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]

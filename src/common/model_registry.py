@@ -19,7 +19,7 @@ Backend = Literal["anomalib", "yolo26-seg"]
 @dataclass
 class ModelEntry:
     backend: Backend
-    checkpoint: Path
+    checkpoint: Path | str  # Path for local files, str (http://...) for a Triton model URL
     model_class: str | None = None
 
 
@@ -71,13 +71,34 @@ def build_onnx_registry(
     return registry
 
 
+def build_triton_registry(
+    triton_url: str = "http://triton:8000",
+    anomalib_model_name: str = paths.ANOMALIB_MODEL_NAME,
+) -> dict[str, ModelEntry]:
+    """YOLO/router entries point at Triton model URLs; Anomalib entries are
+    UNCHANGED (still local ONNX via OpenVINOInferencer) -- Anomalib isn't migrated
+    to Triton this iteration, since there's no equivalent to Ultralytics' native
+    Triton support that would keep its pre/post-processing correct automatically,
+    and hand-replicating Anomalib's exact normalization to talk to raw Triton
+    tensors is a real correctness risk, not just extra work. See README for the
+    full reasoning. Triton model names match router class names 1:1 by design
+    (see serving/triton/generate_model_repository.py), so no separate mapping
+    table is needed here.
+    """
+    registry = build_onnx_registry(anomalib_model_name=anomalib_model_name)
+    for router_class in paths.SUPERVISED_ROUTER_CLASSES:
+        registry[router_class] = ModelEntry(backend="yolo26-seg", checkpoint=f"{triton_url}/{router_class}")
+    return registry
+
+
 def resolve(registry: dict[str, ModelEntry], router_class: str) -> ModelEntry:
     if router_class == "UNKNOWN":
         raise ValueError("Router returned UNKNOWN -- no model to dispatch to.")
     if router_class not in registry:
         raise KeyError(f"Unknown router class '{router_class}'. Known: {sorted(registry)}")
     entry = registry[router_class]
-    if not entry.checkpoint.exists():
+    is_triton = isinstance(entry.checkpoint, str) and entry.checkpoint.startswith(("http://", "https://"))
+    if not is_triton and not Path(entry.checkpoint).exists():
         raise FileNotFoundError(f"'{router_class}' -> {entry.checkpoint} does not exist.")
     return entry
 
@@ -85,11 +106,19 @@ def resolve(registry: dict[str, ModelEntry], router_class: str) -> ModelEntry:
 if __name__ == "__main__":
     import sys
 
-    use_onnx = "--onnx" in sys.argv
-    registry = build_onnx_registry() if use_onnx else build_registry()
-    label = "ONNX (serving)" if use_onnx else "checkpoint (training-time)"
-    print(f"Registry view: {label}\n")
+    mode = "checkpoint (training-time)"
+    if "--onnx" in sys.argv:
+        registry = build_onnx_registry()
+        mode = "ONNX (serving, local)"
+    elif "--triton" in sys.argv:
+        registry = build_triton_registry()
+        mode = "Triton (serving, YOLO models remote)"
+    else:
+        registry = build_registry()
+
+    print(f"Registry view: {mode}\n")
     for name in paths.ROUTER_CLASSES:
         entry = registry[name]
-        exists = "OK" if entry.checkpoint.exists() else "MISSING"
+        is_triton = isinstance(entry.checkpoint, str) and entry.checkpoint.startswith("http")
+        exists = "TRITON-URL" if is_triton else ("OK" if Path(entry.checkpoint).exists() else "MISSING")
         print(f"[{exists}] {name:20s} -> {entry.backend:12s} {entry.checkpoint}")

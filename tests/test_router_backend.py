@@ -13,7 +13,7 @@ def _fake_yolo_cls(top1_idx, top1conf, names):
     )
 
     class FakeYOLO:
-        def __init__(self, path):
+        def __init__(self, path, **kwargs):
             self.path = path
 
         def predict(self, source, verbose=False):

@@ -42,7 +42,7 @@ def test_predict_extracts_regions_with_labels(tmp_path, monkeypatch):
     )
 
     class FakeYOLO:
-        def __init__(self, path):
+        def __init__(self, path, **kwargs):
             self.path = path
 
         def predict(self, source, verbose=False):
@@ -72,7 +72,7 @@ def test_predict_no_detections_returns_empty(tmp_path, monkeypatch):
     )
 
     class FakeYOLO:
-        def __init__(self, path):
+        def __init__(self, path, **kwargs):
             pass
 
         def predict(self, source, verbose=False):
@@ -101,7 +101,7 @@ def test_predict_includes_mask_polygon_when_present(tmp_path, monkeypatch):
     )
 
     class FakeYOLO:
-        def __init__(self, path):
+        def __init__(self, path, **kwargs):
             pass
 
         def predict(self, source, verbose=False):
@@ -127,7 +127,7 @@ def test_get_model_reuses_cached_instance(tmp_path, monkeypatch):
     init_calls = []
 
     class FakeYOLO:
-        def __init__(self, path):
+        def __init__(self, path, **kwargs):
             init_calls.append(path)
 
     monkeypatch.setattr(backend, "YOLO", FakeYOLO)

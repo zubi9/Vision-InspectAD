@@ -8,6 +8,7 @@
 
 numpy>=1.27
 pillow>=10.4
+opencv-python>=4.9
 
 # API
 fastapi>=0.110
@@ -16,7 +17,7 @@ python-multipart>=0.0.9
 
 # Testing
 pytest>=8.0
-httpx2>=0.27
+httpx>=0.27
 
 # Linting
 ruff>=0.6

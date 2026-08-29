@@ -25,6 +25,11 @@ DAGM_YOLO_DATA_YAML = YOLO_SEG_DATASET_ROOT / "dagm" / "data.yaml"
 KOLEKTOR_YOLO_DATA_YAML = YOLO_SEG_DATASET_ROOT / "kolektor" / "data.yaml"
 MAGNETIC_TILE_YOLO_DATA_YAML = YOLO_SEG_DATASET_ROOT / "magnetic_tile" / "data.yaml"
 
+
+# download models from HuggingFace to this folder, or set VI_HF_REPO_ID to a different path
+VI_HF_REPO_ID = os.environ.get("VI_HF_REPO_ID", "zubai4/Vision-InstpectAD")
+
+
 # --- Models: Anomalib (flat layout -- models/patchcore_<category>.ckpt) ---
 ANOMALIB_MODELS_DIR = _p("VI_ANOMALIB_MODELS_DIR", "models")
 ANOMALIB_ONNX_DIR = _p("VI_ANOMALIB_ONNX_DIR", "models/onnx")

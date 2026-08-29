@@ -3,9 +3,15 @@ YOLO26-seg inference backend for the API.
 
 Ultralytics' YOLO() class loads .onnx transparently and runs the same
 pre-processing (letterbox resize) and post-processing (NMS, mask decoding) it would
-for a .pt checkpoint -- so this is a thin wrapper, not a reimplementation. Handles
-all three supervised datasets (DAGM, Magnetic Tiles, Kolektor SDD2) since they're
-trained as one combined model with one shared class head.
+for a .pt checkpoint -- so this is a thin wrapper, not a reimplementation. It also
+natively supports a Triton Inference Server URL (YOLO("http://host:port/model",
+task=...)) via the exact same code path, still handling pre/post-processing
+locally and only dispatching the tensor compute to Triton -- so switching between
+local ONNX and Triton is just a different string/Path passed to predict(), nothing
+in this class needs to know which one it's talking to.
+
+Each of the three supervised datasets (DAGM, Magnetic Tiles, Kolektor SDD2) is a
+separate specialist model (not one combined model -- see PROVENANCE.md).
 """
 
 from pathlib import Path
@@ -17,22 +23,27 @@ from ultralytics import YOLO
 from src.common.schemas import Region
 
 
+def _is_triton_ref(model_ref: Path | str) -> bool:
+    return isinstance(model_ref, str) and model_ref.startswith(("http://", "https://", "triton://"))
+
+
 class Yolo26SegBackend:
     def __init__(self):
         self._model: YOLO | None = None
-        self._loaded_path: Path | None = None
+        self._loaded_ref: Path | str | None = None
 
-    def _get_model(self, onnx_path: Path) -> YOLO:
-        if self._model is not None and self._loaded_path == onnx_path:
+    def _get_model(self, model_ref: Path | str) -> YOLO:
+        if self._model is not None and self._loaded_ref == model_ref:
             return self._model
-        if not onnx_path.exists():
-            raise FileNotFoundError(f"YOLO26-seg ONNX model not found at {onnx_path}")
-        self._model = YOLO(str(onnx_path))
-        self._loaded_path = onnx_path
+        if not _is_triton_ref(model_ref) and not Path(model_ref).exists():
+            raise FileNotFoundError(f"YOLO26-seg model not found at {model_ref}")
+        # task="segment" required for Triton remote models; harmless for local loads.
+        self._model = YOLO(str(model_ref), task="segment")
+        self._loaded_ref = model_ref
         return self._model
 
-    def predict(self, image: Image.Image, onnx_path: Path) -> dict:
-        model = self._get_model(onnx_path)
+    def predict(self, image: Image.Image, model_ref: Path | str) -> dict:
+        model = self._get_model(model_ref)
         result = model.predict(source=np.array(image), verbose=False)[0]
 
         regions: list[Region] = []

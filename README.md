@@ -217,8 +217,6 @@ Streamlit shows a heatmap overlay for anomaly results and drawn boxes/masks for 
 ```bash
 pip install -r requirements-test.txt   # lightweight -- no torch/anomalib/ultralytics needed
 pytest -v
-or Try.
-PYENV_VERSION=<your-testing-env> python -m pytest -v
 ```
 
 `tests/conftest.py` stubs `anomalib`, `ultralytics`, and `mlflow` when they're not installed, since
@@ -240,10 +238,120 @@ checkout) — it creates an empty `models/` dir at build time and relies on `doc
 volume mount for real weights at runtime, which also means CI's Docker build doesn't need any
 trained checkpoints to succeed.
 
+## Triton Deployment & Benchmarking (Phase 6)
+
+**Scope decision, stated plainly:** only the 3 YOLO26-seg specialists + router move to Triton this
+iteration. The 15 Anomalib models stay on their existing local `OpenVINOInferencer` path.
+Ultralytics has native Triton support (`YOLO("http://host:port/model", task=...)`) that still runs
+all of YOLO's own pre/post-processing (letterbox, NMS, mask decoding) locally and only dispatches
+the tensor math to Triton — so nothing about YOLO's correctness is being hand-replicated. Anomalib
+has no equivalent; migrating it would mean reimplementing `OpenVINOInferencer`'s exact
+resize/normalization by hand against raw Triton tensors, which is a real correctness risk (this
+project has already hit one silent-wrong-result bug from a mistaken assumption about `cv2`
+behavior) rather than just extra work. Worth revisiting in a future iteration if it matters enough
+to verify Anomalib's preprocessing constants properly first.
+
+### Local CI/CD (run the GitHub Actions workflow without pushing)
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then the
+   [`GitHub Local Actions`](https://marketplace.visualstudio.com/items?itemName=SanjulaGanepola.github-local-actions)
+   VS Code extension (wraps `nektos/act`).
+2. `.actrc` in this repo already pins a compatible runner image
+   (`catthehacker/ubuntu:act-latest`) — no extra config needed.
+3. Open the extension's **Workflows** view in VS Code and run `test`, `lint`, or `docker-build`
+   individually, or trigger the whole `ci.yml` on a `push` event.
+4. Equivalent from a terminal: `act push` (or `act -j test` for a single job).
+
+No secrets are currently required (the `docker-build` job doesn't push to a registry). If you add
+a registry push later, configure secrets via the extension's **Manage Secrets** view or a local
+`.secrets` file (gitignored).
+
+### Triton model repository
+
+```bash
+python serving/triton/generate_model_repository.py
+```
+
+Symlinks each specialist's real ONNX export into `serving/triton/model_repository/<name>/1/model.onnx`
+and writes a minimal `config.pbtxt` per model. Deliberately uses Triton's auto-complete config
+(only `platform`, `max_batch_size`, `instance_group` are pinned) rather than hand-specifying input/
+output tensor names — Triton reads those straight from each ONNX graph, avoiding another guessed-
+format mismatch. Defaults every model to `KIND_GPU` (confirmed sufficient VRAM for this deployment
+target); pass `--cpu-models <name> ...` to override specific ones.
+
+**`max_batch_size: 0` by default** — Ultralytics only exports ONNX with a dynamic batch axis if
+`dynamic=True` was passed at export time, which this script can't confirm from the file alone.
+Guessing batching support wrong would make Triton refuse to load the model. If your exports do
+support it, re-run with `--dynamic-batch-yolo` for real throughput gains under concurrent load.
+
+### Running it
+
+```bash
+docker compose --profile triton up --build   # triton is opt-in, not started by plain `docker compose up`
+```
+
+Then point the API at Triton:
+
+```bash
+VI_USE_TRITON=true docker compose up api streamlit
+```
+
+(or set `VI_USE_TRITON=true` in `docker-compose.yml`'s `api.environment` permanently once you've
+confirmed it works). Startup logs will say which mode loaded. Triton's HTTP port is remapped to
+`8100` on the host (container-internal traffic between `api` and `triton` still uses the standard
+port `8000` inside the docker network — only the host-side mapping changed, to avoid clashing with
+the API's own `8000`).
+
+### Benchmarking
+
+```bash
+pip install requests
+python serving/benchmark.py --images ./sample_images --requests 50 --concurrency 8
+```
+
+Hits the running API's `/predict` endpoint directly — works identically whether the API is in
+local-ONNX or Triton mode, since it measures real end-to-end client latency either way. Reports
+overall p50/p95/p99 plus a breakdown by which `router_class` actually answered each request (drop
+a handful of sample images spanning different categories/datasets into one folder to see
+per-model-type latency in a single run). **To compare Triton vs. local-ONNX properly:** run this
+script once against each mode (restart the API with a different `VI_USE_TRITON` value between
+runs) — same script, same image set, so the numbers are directly comparable.
+
+## Model Downloads (Hugging Face Hub)
+
+Model weights aren't in this repo or the Docker image (see Dockerfile notes above) — they're
+hosted on Hugging Face Hub and pulled down before deployment.
+
+```bash
+pip install huggingface_hub requests
+
+# interactive -- prompts before downloading a newer version of each file
+python scripts/download_models.py --repo-id <your-hf-username>/<your-model-repo>
+
+# non-interactive (CI, Docker entrypoints, scripted deploys) -- same script, no prompts
+python scripts/download_models.py --repo-id <...> --yes
+# or: VI_HF_REPO_ID=<...> CI=true python scripts/download_models.py
+```
+
+**No default repo ID is baked in** — pass `--repo-id` or set `VI_HF_REPO_ID`. `scripts/HF_TO_LOCAL`
+maps each of the 19 expected filenames (`patchcore_<category>.onnx` x15, `dagm-best.onnx`,
+`kolekor-best.onnx`, `magnetic_tile-best.onnx`, `router-best.onnx`) to exactly the local path
+`model_registry.py`/`paths.py` already expect — nothing else needs touching once files land.
+
+**Interactive vs. automated, resolved the way it has to be:** GitHub Actions runners have no
+terminal, so an `input()` call there would hang until the job times out. The script auto-detects
+this (`sys.stdin.isatty()`, `CI` env var) and skips prompting rather than needing you to remember
+`--yes` every time in CI — but you still get the interactive `[Y/n]` when running it yourself
+locally.
+
+Version checking is done via HTTP ETag comparison against `models/.hf_manifest.json` (not
+committed — gitignored along with the rest of `models/`), so it tells you *which* files have a
+newer version before downloading, rather than `hf_hub_download`'s own silent skip-if-unchanged
+behavior.
+
 ## What's next
 
 Phase 2 (Anomalib model/backbone comparison) picks up once Phase 1 baseline checkpoints exist.
 With the router and YOLO26-seg training now in place too, Phase 3 (the inference API) is the next
 big piece: wiring `model_registry.py` + the router into an actual `/predict` endpoint. See the
 project plan doc for the full Phase 2–6 roadmap.
-# echo test CI

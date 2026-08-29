@@ -1,6 +1,9 @@
 """
-API-side router wrapper. Loads the ONNX-exported YOLO26n-cls router once at
-startup and reuses it across requests.
+API-side router wrapper. Loads the router once at startup and reuses it across
+requests -- either a local ONNX file, or a remote Triton model via Ultralytics'
+native Triton support (YOLO("http://host:port/model_name", task=...)), which
+still runs all of YOLO's own pre/post-processing locally and only dispatches the
+tensor compute to Triton, so no preprocessing is being hand-replicated here.
 
 Same confidence-gating philosophy as src/router_pipeline/inference.py: below
 threshold, return None rather than a forced guess, since a misroute sends the
@@ -24,15 +27,17 @@ class RoutingDecision:
 
 
 class RouterModel:
-    def __init__(self, onnx_path: Path, confidence_threshold: float):
-        if not onnx_path.exists():
+    def __init__(self, model_ref: Path | str, confidence_threshold: float):
+        is_triton = isinstance(model_ref, str) and model_ref.startswith(("http://", "https://", "triton://"))
+        if not is_triton and not Path(model_ref).exists():
             raise FileNotFoundError(
-                f"Router ONNX model not found at {onnx_path}. "
+                f"Router ONNX model not found at {model_ref}. "
                 f"Check ROUTER_ONNX_PATH in api/config.py or the env var of the same name."
             )
-        # Ultralytics' YOLO() loads .onnx transparently, running the same
-        # pre/post-processing pipeline as it would for a .pt checkpoint.
-        self.model = YOLO(str(onnx_path))
+        # task="classify" is required for Triton remote models (can't be inferred
+        # from a URL the way it is from a local .onnx/.pt's embedded metadata) --
+        # harmless to always pass it for local loading too.
+        self.model = YOLO(str(model_ref), task="classify")
         self.confidence_threshold = confidence_threshold
 
     def route(self, image: Image.Image) -> RoutingDecision:

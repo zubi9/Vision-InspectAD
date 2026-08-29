@@ -1,4 +1,28 @@
 services:
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.09-py3
+    command: tritonserver --model-repository=/models --model-control-mode=explicit --load-model=*
+    profiles: ["triton"]  # only starts with `docker compose --profile triton up`, not the plain default
+    ports:
+      - "8100:8000"  # HTTP -- remapped on the host to avoid clashing with the api service's 8000
+      - "8101:8001"  # gRPC
+      - "8102:8002"  # metrics
+    volumes:
+      - ./serving/triton/model_repository:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   api:
     build:
       context: .
@@ -13,6 +37,8 @@ services:
       - VI_DAGM_ONNX_PATH=${VI_DAGM_ONNX_PATH:-/app/models/dagm/weights/best.onnx}
       - VI_KOLEKTOR_ONNX_PATH=${VI_KOLEKTOR_ONNX_PATH:-/app/models/kolektor/weights/best.onnx}
       - VI_MAGNETIC_TILE_ONNX_PATH=${VI_MAGNETIC_TILE_ONNX_PATH:-/app/models/magnetic_tile/weights/best.onnx}
+      - VI_USE_TRITON=${VI_USE_TRITON:-false}
+      - VI_TRITON_URL=http://triton:8000
     volumes:
       - ./models:/app/models
     healthcheck:

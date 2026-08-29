@@ -7,6 +7,7 @@ papermill>=2.5
 pydantic>=2.0
 albumentations>=1.4
 pandas>=2.0
+numpy>=1.27
 scikit-learn>=1.3         # stratified train/val/test split for router dataset prep
 rich>=13.7          # pin a recent version; older rich has known recursion bugs
                      # with wrapped stdout in some notebook environments (VS Code, etc.)
@@ -32,7 +33,10 @@ streamlit>=1.32
 # --- Phase 5 ---
 pytest>=8.0
 httpx>=0.27                   # required by fastapi.testclient.TestClient
+requests>=2.31                # serving/benchmark.py, scripts/download_models.py
+huggingface_hub>=0.24         # scripts/download_models.py
+tritonclient[all]>=2.40       # required by Ultralytics' TritonRemoteModel when VI_USE_TRITON=true
 ruff>=0.6                     # linting, used by CI
 
 # --- Phase 6 ---
-# tritonclient[all]>=2.42
+tritonclient[all]>=2.42

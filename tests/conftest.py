@@ -28,3 +28,8 @@ try:
     import mlflow  # noqa: F401
 except ImportError:
     _stub_module("mlflow")
+
+try:
+    import huggingface_hub  # noqa: F401
+except ImportError:
+    _stub_module("huggingface_hub", hf_hub_download=lambda **kwargs: kwargs["filename"])

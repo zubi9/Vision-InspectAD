@@ -22,23 +22,35 @@ app_state = AppState()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[startup] loading router model...")
+    router_ref = f"{config.TRITON_URL}/router" if config.USE_TRITON else config.ROUTER_ONNX_PATH
+    print(f"[startup] loading router model ({'Triton' if config.USE_TRITON else 'local ONNX'})...")
     app_state.router_model = RouterModel(
-        onnx_path=config.ROUTER_ONNX_PATH,
+        model_ref=router_ref,
         confidence_threshold=config.ROUTER_CONFIDENCE_THRESHOLD,
     )
 
-    print("[startup] building model registry...")
-    app_state.registry = model_registry.build_onnx_registry(
-        anomalib_model_name=config.ANOMALIB_MODEL_NAME,
-        dagm_checkpoint=config.DAGM_ONNX_PATH,
-        kolektor_checkpoint=config.KOLEKTOR_ONNX_PATH,
-        magnetic_tile_checkpoint=config.MAGNETIC_TILE_ONNX_PATH,
-    )
-    missing = [name for name, entry in app_state.registry.items() if not entry.checkpoint.exists()]
+    print(f"[startup] building model registry ({'Triton for YOLO models' if config.USE_TRITON else 'local ONNX'})...")
+    if config.USE_TRITON:
+        app_state.registry = model_registry.build_triton_registry(
+            triton_url=config.TRITON_URL,
+            anomalib_model_name=config.ANOMALIB_MODEL_NAME,
+        )
+    else:
+        app_state.registry = model_registry.build_onnx_registry(
+            anomalib_model_name=config.ANOMALIB_MODEL_NAME,
+            dagm_checkpoint=config.DAGM_ONNX_PATH,
+            kolektor_checkpoint=config.KOLEKTOR_ONNX_PATH,
+            magnetic_tile_checkpoint=config.MAGNETIC_TILE_ONNX_PATH,
+        )
+
+    missing = []
+    for name, entry in app_state.registry.items():
+        is_triton = isinstance(entry.checkpoint, str) and entry.checkpoint.startswith("http")
+        if not is_triton and not entry.checkpoint.exists():
+            missing.append(name)
     if missing:
         print(f"[startup] WARNING: {len(missing)}/{len(app_state.registry)} registry entries "
-              f"point at missing checkpoints (will 500 if routed to): {missing}")
+              f"point at missing local checkpoints (will 500 if routed to): {missing}")
 
     app_state.anomalib_backend = AnomalibBackend(
         device=config.ANOMALIB_DEVICE,

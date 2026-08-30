@@ -27,13 +27,21 @@ class RoutingDecision:
 
 
 class RouterModel:
-    def __init__(self, model_ref: Path | str, confidence_threshold: float):
-        is_triton = isinstance(model_ref, str) and model_ref.startswith(("http://", "https://", "triton://"))
-        if not is_triton and not Path(model_ref).exists():
-            raise FileNotFoundError(
-                f"Router ONNX model not found at {model_ref}. "
-                f"Check ROUTER_ONNX_PATH in api/config.py or the env var of the same name."
+    def __init__(self, model_ref: Path | str | None, confidence_threshold: float):
+        if model_ref is None or (isinstance(model_ref, str) and not model_ref.strip()):
+            raise ValueError(
+                "router model ref is empty or missing. Set VI_ROUTER_ONNX_PATH or enable VI_USE_TRITON=true."
             )
+
+        is_triton = isinstance(model_ref, str) and model_ref.startswith(("http://", "https://", "triton://"))
+        if not is_triton:
+            model_path = Path(model_ref)
+            if not model_path.exists():
+                raise FileNotFoundError(
+                    f"Router ONNX model not found at {model_ref}. "
+                    f"Check VI_ROUTER_ONNX_PATH and ensure the export exists before starting the API."
+                )
+
         # task="classify" is required for Triton remote models (can't be inferred
         # from a URL the way it is from a local .onnx/.pt's embedded metadata) --
         # harmless to always pass it for local loading too.

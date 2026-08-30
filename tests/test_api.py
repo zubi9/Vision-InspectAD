@@ -1,6 +1,7 @@
 import io
 from dataclasses import dataclass
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -52,6 +53,16 @@ def _fake_image_bytes():
     buf = io.BytesIO()
     Image.new("RGB", (16, 16)).save(buf, format="PNG")
     return buf.getvalue()
+
+
+def test_router_model_rejects_missing_or_blank_model_ref():
+    with pytest.raises(ValueError, match="router model"):
+        app_state.router_model = None
+        # On the real constructor, an invalid path should be rejected before
+        # Ultralytics receives it and crashes with a NoneType Path error.
+        from api.backends.router import RouterModel
+
+        RouterModel(model_ref=None, confidence_threshold=0.6)
 
 
 def test_health_endpoint():

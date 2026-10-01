@@ -31,7 +31,7 @@ figures out which one applies to a given image before running inference**, since
 underlying models can tell you "this input isn't for me."
 
 ## Architecture
-<img src="assets/vision-inspect-architecture.jpeg" alt="Vision-InspectAD Architecture Diagram"/>
+<img src="assets/vision-inspect-architecture.png" alt="Vision-InspectAD Architecture Diagram"/>
 
 **The one decision that shapes everything else:** Anomalib's models are one-class — a `bottle`
 checkpoint has no concept that `cable` images exist, so no downstream model can ever recognize
